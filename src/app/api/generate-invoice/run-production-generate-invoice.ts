@@ -13,6 +13,7 @@ import {
   type GenerateInvoiceDeps,
   type GenerateInvoiceResult,
 } from "./generate-invoice";
+import { nowInTimeZone } from "./invoice-time-zone";
 import {
   getEnglishInvoiceRealData,
   getPolishInvoiceRealData,
@@ -48,12 +49,20 @@ function buildGenerateInvoiceDeps(
  *
  * @param options.shouldSendEmail - Set true to send invoice email to recipient.
  * @param options.shouldUploadToGoogleDrive - Set true to upload invoices to Google Drive.
+ * @param options.timeZone - IANA timezone the invoice is dated in.
  */
 export async function runProductionGenerateMonthlyInvoice(options: {
   shouldSendEmail: boolean;
   shouldUploadToGoogleDrive: boolean;
+  timeZone: string;
 }): Promise<GenerateInvoiceResult> {
-  const englishInvoiceData = getEnglishInvoiceRealData();
+  // Captured once for the whole run: the PDF dates, the Drive month/year folder,
+  // the file names and the notification text all derive from this single
+  // instant, so a run that straddles local midnight cannot date the PDF one day
+  // and file it under the next.
+  const now = nowInTimeZone(options.timeZone);
+
+  const englishInvoiceData = getEnglishInvoiceRealData({ now });
   const polishInvoiceData = getPolishInvoiceRealData(englishInvoiceData);
 
   return await generateInvoice(
@@ -66,6 +75,8 @@ export async function runProductionGenerateMonthlyInvoice(options: {
       invoiceEmailRecipient: env.INVOICE_EMAIL_RECIPIENT,
       englishInvoiceData,
       polishInvoiceData,
+      timeZone: options.timeZone,
+      now,
     },
   );
 }
